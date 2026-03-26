@@ -23,9 +23,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from homeassistant.util import dt as dt_util
-
-from .const import DATA_STALE_TIMEOUT, DOMAIN, MANUFACTURER, MODEL, TREND_ICONS
+from .const import DOMAIN, MANUFACTURER, MODEL, TREND_ICONS
 from .coordinator import SibionicsCGMCoordinator, SibionicsCGMData
 
 _LOGGER = logging.getLogger(__name__)
@@ -151,21 +149,10 @@ class SibionicsCGMSensor(
         # Battery and device_state are always available (diagnostic)
         if key in ("battery", "device_state"):
             return True
-        # Other sensors need at least one reading AND data must not be stale
-        data = self.coordinator.data
-        if data.glucose_mgdl is None:
-            return False
-        # Check staleness — mark unavailable if no reading for DATA_STALE_TIMEOUT
-        if data.last_reading_time is not None:
-            now = dt_util.utcnow()
-            last = data.last_reading_time
-            # Handle naive datetimes from legacy persisted data
-            if last.tzinfo is None:
-                last = last.replace(tzinfo=dt_util.UTC)
-            age = (now - last).total_seconds()
-            if age > DATA_STALE_TIMEOUT:
-                return False
-        return True
+        # Other sensors need at least one reading to be available
+        # Once a reading exists, keep showing the last known value
+        # (HA recorder needs continuous availability to build history graphs)
+        return self.coordinator.data.glucose_mgdl is not None
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -175,9 +162,8 @@ class SibionicsCGMSensor(
 
         if key == "glucose_mgdl":
             self._attr_native_value = data.glucose_mgdl
-            # Add history as state attributes
+            # Add history as state attributes (last 50 readings)
             if data.history:
-                recent = data.history[-10:]
                 self._attr_extra_state_attributes = {
                     "history": [
                         {
@@ -185,7 +171,7 @@ class SibionicsCGMSensor(
                             "mgdl": r.glucose_mgdl,
                             "mmol": r.glucose_mmol,
                         }
-                        for r in recent
+                        for r in data.history
                     ]
                 }
         elif key == "glucose_mmol":

@@ -48,7 +48,7 @@ CONF_VARIANT = "variant"
 SCAN_TIMEOUT = 30
 RECONNECT_INTERVAL = 60      # seconds between reconnect attempts
 LIVE_UPDATE_INTERVAL = 60    # sensor sends live reading every 60s
-DATA_STALE_TIMEOUT = 180     # mark data stale after 3 minutes of silence
+DATA_STALE_TIMEOUT = 600     # mark data stale after 10 minutes of silence
 
 # ── Trend Arrows ──────────────────────────────────────────────────────
 TREND_ARROWS = {
