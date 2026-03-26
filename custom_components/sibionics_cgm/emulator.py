@@ -666,6 +666,68 @@ class CalibrationEngine:
             if n & 0x80000000:
                 n -= 0x100000000
             self._write_d(uc, UC_ARM64_REG_D0, math.ldexp(x, n))
+        # ── Single-precision (float) math functions — use S0 register ──
+        elif name == "expf":
+            v = self._read_s(uc)
+            try:
+                r = math.exp(v)
+            except OverflowError:
+                r = float("inf")
+            self._write_s(uc, r)
+        elif name == "sqrtf":
+            self._write_s(uc, math.sqrt(max(0.0, self._read_s(uc))))
+        elif name == "logf":
+            v = self._read_s(uc)
+            self._write_s(uc, math.log(v) if v > 0 else float("-inf"))
+        elif name == "log2f":
+            v = self._read_s(uc)
+            self._write_s(uc, math.log2(v) if v > 0 else float("-inf"))
+        elif name == "log10f":
+            v = self._read_s(uc)
+            self._write_s(uc, math.log10(v) if v > 0 else float("-inf"))
+        elif name == "powf":
+            b = self._read_s(uc)
+            # Second float arg: S1 maps to D0 upper/lower depending on ABI,
+            # but in AArch64, S1 is the low 32 bits of D1
+            e_raw = uc.reg_read(UC_ARM64_REG_D1)
+            e = struct.unpack("<f", struct.pack("<I", e_raw & 0xFFFFFFFF))[0]
+            try:
+                r = math.pow(b, e)
+            except (ValueError, OverflowError):
+                r = float("nan")
+            self._write_s(uc, r)
+        elif name == "fabsf":
+            self._write_s(uc, abs(self._read_s(uc)))
+        elif name == "ceilf":
+            self._write_s(uc, math.ceil(self._read_s(uc)))
+        elif name == "floorf":
+            self._write_s(uc, math.floor(self._read_s(uc)))
+        elif name in ("roundf", "rintf", "nearbyintf"):
+            self._write_s(uc, round(self._read_s(uc)))
+        elif name == "sinf":
+            self._write_s(uc, math.sin(self._read_s(uc)))
+        elif name == "cosf":
+            self._write_s(uc, math.cos(self._read_s(uc)))
+        elif name == "tanf":
+            self._write_s(uc, math.tan(self._read_s(uc)))
+        elif name == "atanf":
+            self._write_s(uc, math.atan(self._read_s(uc)))
+        elif name == "atan2f":
+            y = self._read_s(uc)
+            x_raw = uc.reg_read(UC_ARM64_REG_D1)
+            x = struct.unpack("<f", struct.pack("<I", x_raw & 0xFFFFFFFF))[0]
+            self._write_s(uc, math.atan2(y, x))
+        elif name == "fmodf":
+            x = self._read_s(uc)
+            y_raw = uc.reg_read(UC_ARM64_REG_D1)
+            y = struct.unpack("<f", struct.pack("<I", y_raw & 0xFFFFFFFF))[0]
+            self._write_s(uc, math.fmod(x, y) if y != 0 else float("nan"))
+        elif name == "exp2f":
+            v = self._read_s(uc)
+            try:
+                self._write_s(uc, math.pow(2.0, v))
+            except OverflowError:
+                self._write_s(uc, float("inf"))
         # ── Memory ──
         elif name == "malloc":
             sz = uc.reg_read(UC_ARM64_REG_X0) or 1
@@ -1075,6 +1137,18 @@ class CalibrationEngine:
     @staticmethod
     def _write_d(uc: Uc, reg: int, value: float) -> None:
         uc.reg_write(reg, struct.unpack("<Q", struct.pack("<d", value))[0])
+
+    @staticmethod
+    def _read_s(uc: Uc) -> float:
+        """Read single-precision float from S0 (low 32 bits of D0)."""
+        raw = uc.reg_read(UC_ARM64_REG_S0)
+        return struct.unpack("<f", struct.pack("<I", raw & 0xFFFFFFFF))[0]
+
+    @staticmethod
+    def _write_s(uc: Uc, value: float) -> None:
+        """Write single-precision float to S0."""
+        raw = struct.unpack("<I", struct.pack("<f", value))[0]
+        uc.reg_write(UC_ARM64_REG_S0, raw)
 
     @staticmethod
     def _read_cstring(uc: Uc, addr: int, max_len: int = 4096) -> str:
