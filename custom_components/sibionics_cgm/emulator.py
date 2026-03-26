@@ -601,10 +601,42 @@ class CalibrationEngine:
                 _LOGGER.warning("pow(%.6g, %.6g) failed, returning NaN", b, e)
                 r = float("nan")
             self._write_d(uc, UC_ARM64_REG_D0, r)
-        # NOTE: Math functions like exp, sqrt, sin, cos, expf, etc. are NOT hooked.
-        # They resolve to real ARM64 implementations compiled into the .so libraries
-        # and execute natively within the Unicorn emulator. Only pow() needs a hook
-        # because it's called via PLT in these specific binaries.
+        # Math functions called via PLT (confirmed by runtime hook dispatch).
+        # These are NOT inlined — they're external imports that need Python hooks.
+        elif name == "exp":
+            v = self._read_d(uc, UC_ARM64_REG_D0)
+            try:
+                self._write_d(uc, UC_ARM64_REG_D0, math.exp(v))
+            except OverflowError:
+                self._write_d(uc, UC_ARM64_REG_D0, float("inf"))
+        elif name == "expf":
+            raw = uc.reg_read(UC_ARM64_REG_S0)
+            v = struct.unpack("<f", struct.pack("<I", raw & 0xFFFFFFFF))[0]
+            try:
+                r = math.exp(v)
+            except OverflowError:
+                r = float("inf")
+            uc.reg_write(UC_ARM64_REG_S0, struct.unpack("<I", struct.pack("<f", r))[0])
+        elif name == "sqrt":
+            self._write_d(uc, UC_ARM64_REG_D0, math.sqrt(max(0.0, self._read_d(uc, UC_ARM64_REG_D0))))
+        elif name == "sqrtf":
+            raw = uc.reg_read(UC_ARM64_REG_S0)
+            v = struct.unpack("<f", struct.pack("<I", raw & 0xFFFFFFFF))[0]
+            uc.reg_write(UC_ARM64_REG_S0, struct.unpack("<I", struct.pack("<f", math.sqrt(max(0.0, v))))[0])
+        elif name == "log":
+            v = self._read_d(uc, UC_ARM64_REG_D0)
+            self._write_d(uc, UC_ARM64_REG_D0, math.log(v) if v > 0 else float("-inf"))
+        elif name == "logf":
+            raw = uc.reg_read(UC_ARM64_REG_S0)
+            v = struct.unpack("<f", struct.pack("<I", raw & 0xFFFFFFFF))[0]
+            r = math.log(v) if v > 0 else float("-inf")
+            uc.reg_write(UC_ARM64_REG_S0, struct.unpack("<I", struct.pack("<f", r))[0])
+        elif name == "fabs":
+            self._write_d(uc, UC_ARM64_REG_D0, math.fabs(self._read_d(uc, UC_ARM64_REG_D0)))
+        elif name == "fabsf":
+            raw = uc.reg_read(UC_ARM64_REG_S0)
+            v = struct.unpack("<f", struct.pack("<I", raw & 0xFFFFFFFF))[0]
+            uc.reg_write(UC_ARM64_REG_S0, struct.unpack("<I", struct.pack("<f", abs(v)))[0])
         # ── Memory ──
         elif name == "malloc":
             sz = uc.reg_read(UC_ARM64_REG_X0) or 1
