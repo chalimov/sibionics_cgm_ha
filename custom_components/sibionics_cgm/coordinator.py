@@ -630,11 +630,18 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
                 )
 
                 # Validate calibrated output
-                if not math.isfinite(cal_mmol) or cal_mmol <= 0:
+                if not math.isfinite(cal_mmol) or cal_mmol < 0:
                     _LOGGER.warning(
                         "Invalid calibrated value %.4f at idx %d, skipping",
                         cal_mmol, index,
                     )
+                    continue
+
+                # 0.0 is normal during algorithm warm-up (Kalman filter convergence).
+                # Feed it to the engine (maintains filter state) but don't display.
+                if cal_mmol == 0.0:
+                    if index > self._last_received_index:
+                        self._last_received_index = index
                     continue
 
                 cal_mgdl = mmol_to_mgdl(cal_mmol)
