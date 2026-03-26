@@ -831,7 +831,7 @@ class CalibrationEngine:
             uc.emu_stop()
             return
         elif name in ("md_sensitivity_encrypt", "md_sensitivity_encrypt_faction",
-                       "md_sensitivity_decrypt_faction", "global_app_decrypt",
+                       "global_app_decrypt",
                        "global_app_get_checksum", "global_encrypt_control_cmd",
                        "global_spilt_reply_data", "get_sensitivity_version", "s2jHook"):
             uc.reg_write(UC_ARM64_REG_X0, 0)
