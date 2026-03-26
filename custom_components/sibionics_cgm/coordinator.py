@@ -301,7 +301,11 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
         self._safe_create_task(self._async_connect_and_run())
 
     def _safe_create_task(self, coro: Any) -> None:
-        """Create a task with exception logging (prevents silent failures)."""
+        """Create a background task with exception logging.
+
+        Uses async_create_background_task so long-running data processing
+        (history burst with 600+ readings) does not block HA startup.
+        """
 
         async def _wrapper() -> None:
             try:
@@ -309,7 +313,9 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
             except Exception:
                 _LOGGER.exception("Task failed unexpectedly")
 
-        self.hass.async_create_task(_wrapper())
+        self.hass.async_create_background_task(
+            _wrapper(), f"sibionics_cgm_{self._address}"
+        )
 
     async def _async_connect_and_run(self) -> None:
         """Connect to sensor and start data retrieval."""
