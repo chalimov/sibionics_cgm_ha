@@ -111,6 +111,12 @@ async def async_setup_entry(
     ]
     async_add_entities(entities)
 
+    # Register glucose entity_id for historical state writing
+    for entity in entities:
+        if entity.entity_description.key == "glucose_mgdl":
+            coordinator._glucose_entity_id = entity.entity_id
+            break
+
 
 class SibionicsCGMSensor(
     CoordinatorEntity[SibionicsCGMCoordinator], SensorEntity
