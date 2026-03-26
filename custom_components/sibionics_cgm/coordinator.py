@@ -652,9 +652,11 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
                     continue
 
                 # 0.0 is normal during algorithm warm-up (Kalman filter convergence).
-                # Use raw value as fallback so ALL readings from the device are stored.
+                # Skip these — only show real calibrated values (patient safety).
                 if cal_mmol == 0.0:
-                    cal_mmol = raw_mmol
+                    if index > self._last_received_index:
+                        self._last_received_index = index
+                    continue
 
                 cal_mgdl = mmol_to_mgdl(cal_mmol)
 
