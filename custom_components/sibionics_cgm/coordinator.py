@@ -639,14 +639,6 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
             )
 
             for index, reading_time, raw_mmol, temperature in batch:
-                # Skip already-calibrated indices on reconnect
-                if (
-                    self._engine
-                    and self._engine._reading_index > 0
-                    and index <= self._last_received_index
-                ):
-                    continue
-
                 # Calibrate in executor (CPU-heavy ARM64 emulation)
                 cal_mmol = await self.hass.async_add_executor_job(
                     self._calibrate, raw_mmol, temperature, index
