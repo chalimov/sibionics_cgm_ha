@@ -274,7 +274,7 @@ class CalibrationEngine:
         self._ctx_addr: int = 0
         self._initialized = False
         self._reading_index = 0
-        self._emu_lock = threading.Lock()  # Thread safety for Unicorn engine
+        self._emu_lock = threading.RLock()  # Thread safety for Unicorn engine (reentrant)
 
     @property
     def initialized(self) -> bool:
