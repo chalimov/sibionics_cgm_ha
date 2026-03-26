@@ -35,6 +35,7 @@ SENSOR_DESCRIPTIONS = [
         name="Glucose",
         native_unit_of_measurement="mg/dL",
         state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=0,
         icon="mdi:diabetes",
     ),
     SensorEntityDescription(
@@ -42,6 +43,7 @@ SENSOR_DESCRIPTIONS = [
         name="Glucose (mmol/L)",
         native_unit_of_measurement="mmol/L",
         state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
         icon="mdi:diabetes",
         entity_registry_enabled_default=False,
     ),
