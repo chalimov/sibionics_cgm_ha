@@ -152,6 +152,10 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
     def address(self) -> str:
         return self._address
 
+    @property
+    def ble_enabled(self) -> bool:
+        return self._enabled
+
     async def async_load_data(self) -> None:
         """Load persisted readings from disk."""
         stored = await self._store.async_load()
@@ -648,11 +652,9 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
                     continue
 
                 # 0.0 is normal during algorithm warm-up (Kalman filter convergence).
-                # Feed it to the engine (maintains filter state) but don't display.
+                # Use raw value as fallback so ALL readings from the device are stored.
                 if cal_mmol == 0.0:
-                    if index > self._last_received_index:
-                        self._last_received_index = index
-                    continue
+                    cal_mmol = raw_mmol
 
                 cal_mgdl = mmol_to_mgdl(cal_mmol)
 

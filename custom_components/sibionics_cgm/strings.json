@@ -64,6 +64,11 @@
       "connection": {
         "name": "Connection"
       }
+    },
+    "switch": {
+      "ble_connection_switch": {
+        "name": "BLE Connection"
+      }
     }
   }
 }
