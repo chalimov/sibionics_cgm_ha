@@ -345,7 +345,7 @@ class CalibrationEngine:
             try:
                 self._uc.reg_write(UC_ARM64_REG_X0, str_addr)
                 self._uc.reg_write(UC_ARM64_REG_X1, float_addr)
-                self._uc.reg_write(UC_ARM64_REG_W2, 0)  # faction=0 (standard mode)
+                self._uc.reg_write(UC_ARM64_REG_W2, 1)  # faction=1 (app mode)
 
                 _LOGGER.info("Calling sensitivity decrypt function at 0x%x...", func_addr)
                 self._call_function(func_addr)
@@ -381,10 +381,34 @@ class CalibrationEngine:
             self._ctx_addr = self._heap.malloc(CTX_SIZE + 256)
             self._uc.mem_write(self._ctx_addr, b"\x00" * (CTX_SIZE + 256))
 
-            # Use dll_init with decrypted sensitivity (matching working standalone emulator)
             algo_info = self._libs["algo"]
             base = algo_info["base"]
 
+            # Use serial-based init (includes factory calibration, matching working emulator)
+            serial_sym = algo_info["symbols"].get(
+                "_ZN22NativeAlgorithmV1_1_6A27initEncryptAlgorithmContextEiPh"
+            )
+            if serial_sym:
+                serial_data = sensitivity_input.encode("utf-8")
+                serial_addr = self._heap.malloc(len(serial_data) + 16)
+                self._uc.mem_write(serial_addr, serial_data + b"\x00" * 16)
+
+                sp = self._uc.reg_read(UC_ARM64_REG_SP)
+                try:
+                    self._uc.reg_write(UC_ARM64_REG_X0, self._ctx_addr)
+                    self._uc.reg_write(UC_ARM64_REG_W1, len(serial_data))
+                    self._uc.reg_write(UC_ARM64_REG_X2, serial_addr)
+                    self._call_function(base + serial_sym["addr"])
+                    _LOGGER.info("Algorithm initialized via serial (sensitivity=%.4f)", sensitivity)
+                    self._initialized = True
+                    self._reading_index = 0
+                    return
+                except Exception as exc:
+                    _LOGGER.warning("Serial init failed (%s), falling back to dll_init", exc)
+                finally:
+                    self._uc.reg_write(UC_ARM64_REG_SP, sp)
+
+            # Fallback: dll_init with decrypted sensitivity
             dll_sym = algo_info["symbols"].get("dll_init_algorithm_v116A_context")
             if dll_sym is None:
                 raise RuntimeError("dll_init_algorithm_v116A_context not found")
