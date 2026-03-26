@@ -513,6 +513,9 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
                         "History complete: %d readings, waiting for live data",
                         len(self._readings),
                     )
+                    # Push state once now so entities show the latest
+                    # calibrated value while waiting for first live reading
+                    self.async_set_updated_data(self.data)
 
     def _on_notify(self, sender: Any, data: bytearray) -> None:
         """Handle incoming BLE notifications (called from bleak thread)."""
@@ -692,7 +695,7 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
                 for k in sorted_keys[:-MAX_READINGS_IN_MEMORY]:
                     del self._readings[k]
 
-            # After processing the entire batch, push the latest reading
+            # After processing the entire batch, update internal state
             if not self._readings:
                 return
 
@@ -715,11 +718,13 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
                 history=history,
                 device_state="receiving",
             )
-            self.async_set_updated_data(self.data)
 
-            # Log live readings and catch-up info
-            is_live = len(batch) == 1 and self._history_done
+            # Only push state updates for live readings (not history burst).
+            # During history burst, hundreds of readings arrive in seconds —
+            # pushing each one creates noisy min/max spikes in HA's recorder.
+            is_live = self._history_done
             if is_live:
+                self.async_set_updated_data(self.data)
                 _LOGGER.info(
                     "LIVE #%d: %d mg/dL (%.1f mmol/L) at %s",
                     latest.index, latest.glucose_mgdl, latest.glucose_mmol,
@@ -728,10 +733,9 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
             elif len(batch) > 1:
                 first_idx = batch[0][0]
                 last_idx = batch[-1][0]
-                _LOGGER.info(
-                    "Processed %d readings (idx %d-%d), latest: %d mg/dL at %s",
-                    len(batch), first_idx, last_idx,
-                    latest.glucose_mgdl, latest.timestamp.strftime("%H:%M"),
+                _LOGGER.debug(
+                    "History burst: %d readings (idx %d-%d), latest: %d mg/dL",
+                    len(batch), first_idx, last_idx, latest.glucose_mgdl,
                 )
 
             # Persist readings to survive HA restarts
