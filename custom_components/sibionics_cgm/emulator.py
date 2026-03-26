@@ -319,11 +319,27 @@ class CalibrationEngine:
         )
 
     def decrypt_sensitivity(self, sensitivity_input: str) -> float:
-        """Decrypt per-sensor sensitivity from QR serial fragment."""
+        """Decrypt per-sensor sensitivity from QR serial fragment.
+
+        Tries faction=1 (app mode) first, falls back to faction=0 (standard).
+        """
         if not self._uc:
             raise RuntimeError("Call setup() first")
 
         _LOGGER.info("Decrypting sensitivity for input=%s", sensitivity_input[:4] + "****")
+
+        # Try faction=1 first (app mode, used by official app), then faction=0
+        for faction in (1, 0):
+            val = self._decrypt_sensitivity_faction(sensitivity_input, faction)
+            if val is not None and 0.3 <= val <= 4.0:
+                _LOGGER.info("Sensitivity decrypted: %.4f (faction=%d)", val, faction)
+                return val
+            _LOGGER.debug("Faction %d returned %.4f — trying next", faction, val or 0.0)
+
+        raise ValueError(f"Sensitivity decryption failed for both faction modes, input={sensitivity_input}")
+
+    def _decrypt_sensitivity_faction(self, sensitivity_input: str, faction: int) -> float | None:
+        """Try decrypting sensitivity with a specific faction mode."""
         with self._emu_lock:
             sens_info = self._libs["sens"]
             base = sens_info["base"]
@@ -345,27 +361,19 @@ class CalibrationEngine:
             try:
                 self._uc.reg_write(UC_ARM64_REG_X0, str_addr)
                 self._uc.reg_write(UC_ARM64_REG_X1, float_addr)
-                self._uc.reg_write(UC_ARM64_REG_W2, 1)  # faction=1 (app mode)
+                self._uc.reg_write(UC_ARM64_REG_W2, faction)
 
-                _LOGGER.info("Calling sensitivity decrypt function at 0x%x...", func_addr)
                 self._call_function(func_addr)
-                _LOGGER.info("Sensitivity decrypt function returned")
 
                 ret = self._uc.reg_read(UC_ARM64_REG_W0)
                 sens_bytes = bytes(self._uc.mem_read(float_addr, 4))
                 sens_val = struct.unpack("<f", sens_bytes)[0]
+            except Exception as exc:
+                _LOGGER.debug("Sensitivity decrypt faction=%d failed: %s", faction, exc)
+                return None
             finally:
                 self._uc.reg_write(UC_ARM64_REG_SP, sp)
 
-        # Tightened validation: clinically valid sensitivity range
-        if sens_val < 0.3 or sens_val > 4.0:
-            _LOGGER.warning(
-                "Sensitivity %.4f out of valid range [0.3, 4.0] (ret=%d), input=%s",
-                sens_val, ret, sensitivity_input,
-            )
-            raise ValueError(f"Sensitivity decryption failed: {sens_val}")
-
-        _LOGGER.debug("Sensitivity decrypted: %.4f (input=%s)", sens_val, sensitivity_input)
         return sens_val
 
     def initialize(self, sensitivity_input: str) -> None:
