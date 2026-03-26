@@ -620,6 +620,10 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
         async with self._processing_lock:
             # Sort batch by index to ensure correct order
             batch.sort(key=lambda x: x[0])
+            _LOGGER.debug(
+                "Processing batch: %d readings, idx %d-%d",
+                len(batch), batch[0][0], batch[-1][0],
+            )
 
             for index, reading_time, raw_mmol, temperature in batch:
                 # Skip already-calibrated indices on reconnect
