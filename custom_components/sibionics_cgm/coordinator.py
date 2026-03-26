@@ -788,9 +788,16 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
         Uses hass.states.async_set with the timestamp parameter so
         the recorder stores each reading at its original device time,
         producing correct history graphs.
+
+        Skips readings within 10 minutes of now — the emulator's filters
+        may not have fully converged for the most recent readings during
+        a history burst. Live readings will fill in the gap correctly.
         """
         if not self._glucose_entity_id:
             return
+
+        now_ts = time.time()
+        cutoff_ts = now_ts - 600  # 10 minutes ago
 
         for index, reading_time, raw_mmol, temperature in batch:
             reading = self._readings.get(index)
@@ -798,6 +805,11 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
                 continue
 
             ts = reading.timestamp.timestamp()
+
+            # Skip recent readings — let live updates handle them
+            if ts > cutoff_ts:
+                continue
+
             self.hass.states.async_set(
                 self._glucose_entity_id,
                 str(reading.glucose_mgdl),
