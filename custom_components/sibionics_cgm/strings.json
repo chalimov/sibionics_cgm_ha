@@ -1,0 +1,69 @@
+{
+  "config": {
+    "flow_title": "SIBIONICS CGM ({name})",
+    "step": {
+      "user": {
+        "title": "Select your SIBIONICS CGM sensor",
+        "description": "Choose the CGM sensor to add.",
+        "data": {
+          "address": "Device"
+        }
+      },
+      "qr_code": {
+        "title": "Enter sensor QR code",
+        "description": "Scan the QR code on the SIBIONICS sensor packaging and paste the full data string here.\n\nDevice: **{name}**",
+        "data": {
+          "qr_code": "QR code data"
+        }
+      },
+      "confirm": {
+        "title": "Confirm setup",
+        "description": "Ready to set up **{name}**\n\n- Serial: `{serial}`\n- Sensitivity input: `{sensitivity_input}`\n\nThe calibration engine will initialize on first connection."
+      }
+    },
+    "abort": {
+      "already_configured": "This sensor is already configured.",
+      "no_devices_found": "No SIBIONICS CGM sensors found. Make sure the sensor is active and your phone's Bluetooth connection to it is disabled."
+    },
+    "error": {
+      "invalid_qr_code": "Invalid QR code. Expected GS1 format with AI 21 serial number (e.g., containing '(21)250770QF32450CAA59').",
+      "qr_device_mismatch": "QR code does not match the discovered sensor. The match key from the QR serial should appear in the BLE device name."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "glucose_mgdl": {
+        "name": "Glucose"
+      },
+      "glucose_mmol": {
+        "name": "Glucose (mmol/L)"
+      },
+      "trend": {
+        "name": "Glucose Trend"
+      },
+      "temperature": {
+        "name": "Sensor Temperature"
+      },
+      "raw_mmol": {
+        "name": "Raw Glucose"
+      },
+      "battery": {
+        "name": "Battery"
+      },
+      "last_reading_time": {
+        "name": "Last Reading"
+      },
+      "reading_count": {
+        "name": "Reading Count"
+      },
+      "device_state": {
+        "name": "Device State"
+      }
+    },
+    "binary_sensor": {
+      "connection": {
+        "name": "Connection"
+      }
+    }
+  }
+}

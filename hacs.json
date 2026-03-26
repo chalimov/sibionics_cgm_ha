@@ -1,0 +1,5 @@
+{
+  "name": "SIBIONICS CGM (GS1 Glucose Monitor)",
+  "render_readme": true,
+  "homeassistant": "2025.1.0"
+}

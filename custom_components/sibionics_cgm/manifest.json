@@ -1,0 +1,24 @@
+{
+  "domain": "sibionics_cgm",
+  "name": "SIBIONICS CGM",
+  "codeowners": ["@chalimov"],
+  "config_flow": true,
+  "dependencies": ["bluetooth"],
+  "documentation": "https://github.com/chalimov/sibionics_cgm_ha",
+  "bluetooth": [
+    {
+      "service_uuid": "0000ff30-0000-1000-8000-00805f9b34fb",
+      "connectable": true
+    }
+  ],
+  "integration_type": "device",
+  "iot_class": "local_push",
+  "requirements": [
+    "bleak>=0.21.1",
+    "bleak-retry-connector>=3.4.0",
+    "unicorn>=2.0.0",
+    "pyelftools>=0.29"
+  ],
+  "homeassistant": "2025.1.0",
+  "version": "0.1.0"
+}
