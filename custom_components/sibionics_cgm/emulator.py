@@ -282,6 +282,7 @@ class CalibrationEngine:
 
     def setup(self) -> None:
         """Parse ELF files and set up the emulator. Call once."""
+        _LOGGER.info("Emulator setup starting (lib_dir=%s)", self._lib_dir)
         algo_path = os.path.join(self._lib_dir, "libnative-algorithm-v1_1_6A.so")
         sens_path = os.path.join(self._lib_dir, "libnative-sensitivity-v110.so")
 
@@ -322,6 +323,7 @@ class CalibrationEngine:
         if not self._uc:
             raise RuntimeError("Call setup() first")
 
+        _LOGGER.info("Decrypting sensitivity for input=%s", sensitivity_input[:4] + "****")
         with self._emu_lock:
             sens_info = self._libs["sens"]
             base = sens_info["base"]
@@ -345,7 +347,9 @@ class CalibrationEngine:
                 self._uc.reg_write(UC_ARM64_REG_X1, float_addr)
                 self._uc.reg_write(UC_ARM64_REG_W2, 0)  # faction=0 (standard mode)
 
+                _LOGGER.info("Calling sensitivity decrypt function at 0x%x...", func_addr)
                 self._call_function(func_addr)
+                _LOGGER.info("Sensitivity decrypt function returned")
 
                 ret = self._uc.reg_read(UC_ARM64_REG_W0)
                 sens_bytes = bytes(self._uc.mem_read(float_addr, 4))
@@ -369,6 +373,7 @@ class CalibrationEngine:
         if not self._uc:
             self.setup()
 
+        _LOGGER.info("Initializing calibration algorithm...")
         sensitivity = self.decrypt_sensitivity(sensitivity_input)
 
         with self._emu_lock:
