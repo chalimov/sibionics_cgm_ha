@@ -182,6 +182,11 @@ class SibionicsCGMSensor(
                         for r in data.history
                     ]
                 }
+            # During history burst, glucose state is written via
+            # hass.states.async_set with device timestamps.
+            # Don't also write via async_write_ha_state (avoids duplicates).
+            if data.device_state == "receiving" and not self.coordinator._history_done:
+                return
         elif key == "glucose_mmol":
             self._attr_native_value = data.glucose_mmol
         elif key == "trend":

@@ -717,19 +717,19 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
                 device_state="receiving",
             )
 
-            is_live = self._history_done
+            # Always push coordinator data so all entities stay current
+            # (trend, last_reading, battery, etc.)
+            self.async_set_updated_data(self.data)
 
-            if is_live:
-                # Live reading — push via coordinator (normal HA flow)
-                self.async_set_updated_data(self.data)
+            if self._history_done:
                 _LOGGER.info(
                     "LIVE #%d: %d mg/dL (%.1f mmol/L) at %s",
                     latest.index, latest.glucose_mgdl, latest.glucose_mmol,
                     latest.timestamp.strftime("%H:%M"),
                 )
             else:
-                # History burst — write each reading to HA recorder with
-                # its original device timestamp for correct history graphs.
+                # History burst — write glucose readings to HA recorder
+                # with original device timestamps for correct history graphs.
                 await self._write_historical_states(batch)
                 if len(batch) > 1:
                     _LOGGER.debug(
