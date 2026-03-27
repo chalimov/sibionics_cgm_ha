@@ -202,6 +202,7 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
                 reading_count=len(self._readings),
                 history=history,
                 device_state="disconnected",
+                patient_name=self.data.patient_name,
             )
 
     async def async_save_data(self) -> None:
@@ -716,6 +717,7 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
                 reading_count=len(self._readings),
                 history=history,
                 device_state="receiving",
+                patient_name=self.data.patient_name,
             )
 
             # Always push coordinator data so all entities stay current
