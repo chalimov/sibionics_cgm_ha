@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1E88E5"/>
+      <stop offset="100%" style="stop-color:#0D47A1"/>
+    </linearGradient>
+  </defs>
+  <!-- Rounded square background -->
+  <rect x="16" y="16" width="480" height="480" rx="96" ry="96" fill="url(#bg)"/>
+  <!-- Blood drop shape -->
+  <path d="M256 80 C256 80 160 220 160 300 C160 353 203 396 256 396 C309 396 352 353 352 300 C352 220 256 80 256 80Z" fill="#ffffff" opacity="0.95"/>
+  <!-- Glucose wave line inside drop -->
+  <path d="M192 300 Q210 260 228 290 Q246 320 264 280 Q282 240 300 290 Q318 340 320 300"
+        stroke="#1E88E5" stroke-width="12" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- BLE signal arcs (right side) -->
+  <path d="M370 200 Q390 230 370 260" stroke="#ffffff" stroke-width="8" fill="none" stroke-linecap="round" opacity="0.7"/>
+  <path d="M390 185 Q420 230 390 275" stroke="#ffffff" stroke-width="8" fill="none" stroke-linecap="round" opacity="0.5"/>
+  <path d="M410 170 Q450 230 410 290" stroke="#ffffff" stroke-width="8" fill="none" stroke-linecap="round" opacity="0.3"/>
+  <!-- Text "CGM" -->
+  <text x="256" y="460" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-weight="bold" font-size="52" fill="#ffffff" opacity="0.9">CGM</text>
+</svg>
