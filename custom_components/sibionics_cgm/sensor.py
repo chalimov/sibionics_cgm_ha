@@ -101,6 +101,20 @@ SENSOR_DESCRIPTIONS = [
         icon="mdi:account",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
+    SensorEntityDescription(
+        key="days_remaining",
+        name="Sensor Days Remaining",
+        native_unit_of_measurement="d",
+        icon="mdi:calendar-clock",
+        suggested_display_precision=1,
+    ),
+    SensorEntityDescription(
+        key="sensor_started",
+        name="Sensor Activated",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        icon="mdi:calendar-start",
+        entity_registry_enabled_default=False,
+    ),
 ]
 
 
@@ -161,9 +175,12 @@ class SibionicsCGMSensor(
     @property
     def available(self) -> bool:
         key = self.entity_description.key
-        # Battery, device_state, patient_name are always available
+        # Battery, device_state, patient_name always available
         if key in ("battery", "device_state", "patient_name"):
             return True
+        # Days remaining / sensor started available once we have data
+        if key in ("days_remaining", "sensor_started"):
+            return self.coordinator.data.sensor_started is not None
         # Other sensors need at least one reading to be available
         # Once a reading exists, keep showing the last known value
         # (HA recorder needs continuous availability to build history graphs)
@@ -217,5 +234,9 @@ class SibionicsCGMSensor(
             self._attr_native_value = data.device_state
         elif key == "patient_name":
             self._attr_native_value = data.patient_name or "Not set"
+        elif key == "days_remaining":
+            self._attr_native_value = data.days_remaining
+        elif key == "sensor_started":
+            self._attr_native_value = data.sensor_started
 
         self.async_write_ha_state()

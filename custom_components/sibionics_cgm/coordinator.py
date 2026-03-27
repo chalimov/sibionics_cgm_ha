@@ -92,6 +92,8 @@ class SibionicsCGMData:
     history: list[GlucoseReading] = field(default_factory=list)
     device_state: str = "disconnected"
     patient_name: str = ""
+    sensor_started: datetime | None = None
+    days_remaining: float | None = None
 
 
 def _checksum(data: bytes) -> int:
@@ -706,7 +708,14 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
                 return
 
             latest = max(self._readings.values(), key=lambda r: r.index)
+            earliest = min(self._readings.values(), key=lambda r: r.index)
             history = sorted(self._readings.values(), key=lambda r: r.index)[-50:]
+
+            # Track sensor start time from earliest reading
+            sensor_started = self.data.sensor_started or earliest.timestamp
+            now = datetime.now(timezone.utc)
+            elapsed = (now - sensor_started).total_seconds() / 86400
+            days_remaining = round(max(14.0 - elapsed, 0.0), 1)
 
             self.data = SibionicsCGMData(
                 connected=self._connected,
@@ -724,6 +733,8 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
                 history=history,
                 device_state="receiving",
                 patient_name=self.data.patient_name,
+                sensor_started=sensor_started,
+                days_remaining=days_remaining,
             )
 
             # Always push coordinator data so all entities stay current

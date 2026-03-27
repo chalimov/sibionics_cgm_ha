@@ -72,6 +72,12 @@
       },
       "patient_name": {
         "name": "User"
+      },
+      "days_remaining": {
+        "name": "Sensor Days Remaining"
+      },
+      "sensor_started": {
+        "name": "Sensor Activated"
       }
     },
     "binary_sensor": {
