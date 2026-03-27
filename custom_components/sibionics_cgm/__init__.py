@@ -53,6 +53,9 @@ async def async_setup_entry(
     await coordinator.async_setup()
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
+    # Listen for options updates (patient name change)
+    entry.async_on_unload(entry.add_update_listener(async_update_options))
+
     # Push restored data to entities now that they exist
     coordinator.async_set_updated_data(coordinator.data)
 
@@ -70,3 +73,16 @@ async def async_unload_entry(
     await coordinator.async_disable_connection()
 
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+
+
+async def async_update_options(
+    hass: HomeAssistant, entry: SibionicsCGMConfigEntry
+) -> None:
+    """Handle options update — push patient name change to coordinator."""
+    coordinator: SibionicsCGMCoordinator = entry.runtime_data
+    from dataclasses import replace
+    coordinator.data = replace(
+        coordinator.data,
+        patient_name=entry.data.get(CONF_PATIENT_NAME, ""),
+    )
+    coordinator.async_set_updated_data(coordinator.data)
