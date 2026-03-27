@@ -354,6 +354,12 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
                     )
                     self.async_set_updated_data(self.data)
                     await self._disconnect()
+                    # Schedule reconnect after failure
+                    if self._enabled:
+                        self.hass.loop.call_later(
+                            RECONNECT_INTERVAL,
+                            lambda: self._safe_create_task(self._async_connect_and_run()),
+                        )
                     return
 
                 # _start_data_stream exited normally (timeout / no data)
