@@ -150,6 +150,7 @@ class SibionicsCGMSensor(
 
     _attr_has_entity_name = True
     _attr_should_poll = False
+    _attr_force_update = True
 
     def __init__(
         self,
