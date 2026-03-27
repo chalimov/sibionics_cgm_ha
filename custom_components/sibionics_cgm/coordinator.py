@@ -89,7 +89,6 @@ class SibionicsCGMData:
     model: str | None = None
     last_reading_time: datetime | None = None
     reading_count: int = 0
-    history: list[GlucoseReading] = field(default_factory=list)
     device_state: str = "disconnected"
     patient_name: str = ""
     sensor_started: datetime | None = None
@@ -193,7 +192,6 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
 
         if self._readings:
             latest = max(self._readings.values(), key=lambda r: r.index)
-            history = sorted(self._readings.values(), key=lambda r: r.index)[-50:]
             self.data = SibionicsCGMData(
                 glucose_mmol=latest.glucose_mmol,
                 glucose_mgdl=latest.glucose_mgdl,
@@ -202,7 +200,6 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
                 trend=latest.trend,
                 last_reading_time=latest.timestamp,
                 reading_count=len(self._readings),
-                history=history,
                 device_state="disconnected",
                 patient_name=self.data.patient_name,
             )
@@ -709,7 +706,6 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
 
             latest = max(self._readings.values(), key=lambda r: r.index)
             earliest = min(self._readings.values(), key=lambda r: r.index)
-            history = sorted(self._readings.values(), key=lambda r: r.index)[-50:]
 
             # Track sensor start time from earliest reading
             sensor_started = self.data.sensor_started or earliest.timestamp
@@ -730,7 +726,6 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
                 model=self.data.model,
                 last_reading_time=latest.timestamp,
                 reading_count=len(self._readings),
-                history=history,
                 device_state="receiving",
                 patient_name=self.data.patient_name,
                 sensor_started=sensor_started,

@@ -197,18 +197,6 @@ class SibionicsCGMSensor(
 
         if key == "glucose_mgdl":
             self._attr_native_value = data.glucose_mgdl
-            # Add history as state attributes (last 50 readings)
-            if data.history:
-                self._attr_extra_state_attributes = {
-                    "history": [
-                        {
-                            "time": r.timestamp.isoformat(),
-                            "mgdl": r.glucose_mgdl,
-                            "mmol": r.glucose_mmol,
-                        }
-                        for r in data.history
-                    ]
-                }
             # During history/catch-up burst, glucose state is written via
             # hass.states.async_set with device timestamps — skip here
             # to avoid duplicate recorder entries.
