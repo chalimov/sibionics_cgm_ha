@@ -210,14 +210,10 @@ class SibionicsCGMSensor(
                     ]
                 }
             # During history/catch-up burst, glucose state is written via
-            # hass.states.async_set with device timestamps.
-            # Don't also write via async_write_ha_state (avoids duplicates).
-            # Check if the reading is older than 2 minutes (historical).
-            if data.last_reading_time is not None:
-                import time as _time
-                age = _time.time() - data.last_reading_time.timestamp()
-                if age > 120:
-                    return
+            # hass.states.async_set with device timestamps — skip here
+            # to avoid duplicate recorder entries.
+            if not self.coordinator._history_done:
+                return
         elif key == "glucose_mmol":
             self._attr_native_value = data.glucose_mmol
         elif key == "trend":

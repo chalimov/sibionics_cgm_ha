@@ -737,10 +737,6 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
                 days_remaining=days_remaining,
             )
 
-            # Always push coordinator data so all entities stay current
-            # (trend, last_reading, battery, etc.)
-            self.async_set_updated_data(self.data)
-
             # Write historical readings (device timestamp > 2 min old) to
             # recorder with original timestamps. This covers both the initial
             # history burst AND reconnect catch-up bursts.
@@ -752,17 +748,28 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
             if historical:
                 await self._write_historical_states(historical)
 
-            if latest.timestamp.timestamp() >= now_ts - 120:
-                _LOGGER.info(
-                    "LIVE #%d: %d mg/dL (%.1f mmol/L) at %s",
-                    latest.index, latest.glucose_mgdl, latest.glucose_mmol,
-                    latest.timestamp.strftime("%H:%M"),
-                )
-            elif len(batch) > 1:
-                _LOGGER.debug(
-                    "History burst: %d readings (idx %d-%d), latest: %d mg/dL",
-                    len(batch), batch[0][0], batch[-1][0], latest.glucose_mgdl,
-                )
+            is_live = latest.timestamp.timestamp() >= now_ts - 120
+
+            # For live readings, only push to HA every 5 minutes
+            # (matching official app display interval).
+            # The algorithm still processes every 1-min reading internally.
+            if is_live:
+                if latest.index % 5 == 0:
+                    self.async_set_updated_data(self.data)
+                    _LOGGER.info(
+                        "LIVE #%d: %d mg/dL (%.1f mmol/L) at %s",
+                        latest.index, latest.glucose_mgdl, latest.glucose_mmol,
+                        latest.timestamp.strftime("%H:%M"),
+                    )
+            else:
+                # During burst, push coordinator data so trend/battery/etc update
+                # but DON'T write glucose state (historical backfill handles it)
+                self.async_set_updated_data(self.data)
+                if len(batch) > 1:
+                    _LOGGER.debug(
+                        "History burst: %d readings (idx %d-%d), latest: %d mg/dL",
+                        len(batch), batch[0][0], batch[-1][0], latest.glucose_mgdl,
+                    )
 
             # Persist readings to survive HA restarts
             await self.async_save_data()

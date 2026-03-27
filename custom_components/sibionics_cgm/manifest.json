@@ -20,5 +20,5 @@
     "pyelftools>=0.29"
   ],
   "homeassistant": "2025.1.0",
-  "version": "0.10.4"
+  "version": "0.11.0"
 }
