@@ -16,6 +16,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     CONF_ADDRESS,
     CONF_NAME,
+    EntityCategory,
     PERCENTAGE,
     UnitOfTemperature,
 )
@@ -96,8 +97,9 @@ SENSOR_DESCRIPTIONS = [
     ),
     SensorEntityDescription(
         key="patient_name",
-        name="Patient",
+        name="User",
         icon="mdi:account",
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
 ]
 
@@ -214,6 +216,6 @@ class SibionicsCGMSensor(
         elif key == "device_state":
             self._attr_native_value = data.device_state
         elif key == "patient_name":
-            self._attr_native_value = data.patient_name or None
+            self._attr_native_value = data.patient_name or "Not set"
 
         self.async_write_ha_state()

@@ -71,7 +71,7 @@
         "name": "Device State"
       },
       "patient_name": {
-        "name": "Patient"
+        "name": "User"
       }
     },
     "binary_sensor": {
