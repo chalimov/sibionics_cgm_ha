@@ -107,12 +107,14 @@ SENSOR_DESCRIPTIONS = [
         native_unit_of_measurement="d",
         icon="mdi:calendar-clock",
         suggested_display_precision=1,
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     SensorEntityDescription(
         key="sensor_started",
         name="Sensor Activated",
         device_class=SensorDeviceClass.TIMESTAMP,
         icon="mdi:calendar-start",
+        entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=False,
     ),
 ]
