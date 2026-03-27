@@ -831,9 +831,8 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
                 context=Context(id=ulid_at_time(ts)),
                 timestamp=ts,
             )
-
-        # Yield to event loop between batches to avoid blocking
-        await asyncio.sleep(0)
+            # Small yield between writes so recorder can commit each state
+            await asyncio.sleep(0)
 
     async def _wait_response(self, timeout: float = 10.0) -> bool:
         """Wait for a response from the sensor."""
