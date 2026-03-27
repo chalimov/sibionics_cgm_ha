@@ -94,6 +94,11 @@ SENSOR_DESCRIPTIONS = [
         icon="mdi:bluetooth",
         entity_registry_enabled_default=False,
     ),
+    SensorEntityDescription(
+        key="patient_name",
+        name="Patient",
+        icon="mdi:account",
+    ),
 ]
 
 
@@ -154,8 +159,8 @@ class SibionicsCGMSensor(
     @property
     def available(self) -> bool:
         key = self.entity_description.key
-        # Battery and device_state are always available (diagnostic)
-        if key in ("battery", "device_state"):
+        # Battery, device_state, patient_name are always available
+        if key in ("battery", "device_state", "patient_name"):
             return True
         # Other sensors need at least one reading to be available
         # Once a reading exists, keep showing the last known value
@@ -208,5 +213,7 @@ class SibionicsCGMSensor(
             self._attr_native_value = data.reading_count
         elif key == "device_state":
             self._attr_native_value = data.device_state
+        elif key == "patient_name":
+            self._attr_native_value = data.patient_name or None
 
         self.async_write_ha_state()

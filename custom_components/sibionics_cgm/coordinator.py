@@ -91,6 +91,7 @@ class SibionicsCGMData:
     reading_count: int = 0
     history: list[GlucoseReading] = field(default_factory=list)
     device_state: str = "disconnected"
+    patient_name: str = ""
 
 
 def _checksum(data: bytes) -> int:

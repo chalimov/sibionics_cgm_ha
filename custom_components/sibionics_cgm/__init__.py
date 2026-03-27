@@ -15,7 +15,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_ADDRESS, CONF_NAME, Platform
 from homeassistant.core import HomeAssistant
 
-from .const import CONF_SENSITIVITY_INPUT, CONF_VARIANT, DOMAIN
+from .const import CONF_PATIENT_NAME, CONF_SENSITIVITY_INPUT, CONF_VARIANT, DOMAIN
 from .coordinator import SibionicsCGMCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -43,12 +43,18 @@ async def async_setup_entry(
     )
     entry.runtime_data = coordinator
 
+    # Set patient name from config entry
+    from dataclasses import replace
+    coordinator.data = replace(
+        coordinator.data,
+        patient_name=entry.data.get(CONF_PATIENT_NAME, ""),
+    )
+
     await coordinator.async_setup()
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     # Push restored data to entities now that they exist
-    if coordinator.data.glucose_mgdl is not None:
-        coordinator.async_set_updated_data(coordinator.data)
+    coordinator.async_set_updated_data(coordinator.data)
 
     return True
 
