@@ -13,12 +13,13 @@
         "title": "Enter sensor QR code",
         "description": "Scan the QR code on the SIBIONICS sensor packaging and paste the full data string here.\n\nDevice: **{name}**",
         "data": {
+          "patient_name": "Patient full name",
           "qr_code": "QR code data"
         }
       },
       "confirm": {
         "title": "Confirm setup",
-        "description": "Ready to set up **{name}**\n\n- Serial: `{serial}`\n- Sensitivity input: `{sensitivity_input}`\n\nThe calibration engine will initialize on first connection."
+        "description": "Ready to set up **{name}**\n\n- Patient: **{patient_name}**\n- Serial: `{serial}`\n- Sensitivity input: `{sensitivity_input}`\n\nThe calibration engine will initialize on first connection."
       }
     },
     "abort": {

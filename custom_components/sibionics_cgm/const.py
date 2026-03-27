@@ -43,6 +43,7 @@ CONF_SENSOR_SERIAL = "sensor_serial"
 CONF_SENSITIVITY_INPUT = "sensitivity_input"
 CONF_BLE_MATCH_KEY = "ble_match_key"
 CONF_VARIANT = "variant"
+CONF_PATIENT_NAME = "patient_name"
 
 # ── Timing ────────────────────────────────────────────────────────────
 SCAN_TIMEOUT = 30

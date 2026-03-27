@@ -721,21 +721,28 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
             # (trend, last_reading, battery, etc.)
             self.async_set_updated_data(self.data)
 
-            if self._history_done:
+            # Write historical readings (device timestamp > 2 min old) to
+            # recorder with original timestamps. This covers both the initial
+            # history burst AND reconnect catch-up bursts.
+            now_ts = time.time()
+            historical = [
+                (idx, rt, rg, tmp) for idx, rt, rg, tmp in batch
+                if self._readings.get(idx) and rt.timestamp() < now_ts - 120
+            ]
+            if historical:
+                await self._write_historical_states(historical)
+
+            if latest.timestamp.timestamp() >= now_ts - 120:
                 _LOGGER.info(
                     "LIVE #%d: %d mg/dL (%.1f mmol/L) at %s",
                     latest.index, latest.glucose_mgdl, latest.glucose_mmol,
                     latest.timestamp.strftime("%H:%M"),
                 )
-            else:
-                # History burst — write glucose readings to HA recorder
-                # with original device timestamps for correct history graphs.
-                await self._write_historical_states(batch)
-                if len(batch) > 1:
-                    _LOGGER.debug(
-                        "History burst: %d readings (idx %d-%d), latest: %d mg/dL",
-                        len(batch), batch[0][0], batch[-1][0], latest.glucose_mgdl,
-                    )
+            elif len(batch) > 1:
+                _LOGGER.debug(
+                    "History burst: %d readings (idx %d-%d), latest: %d mg/dL",
+                    len(batch), batch[0][0], batch[-1][0], latest.glucose_mgdl,
+                )
 
             # Persist readings to survive HA restarts
             await self.async_save_data()

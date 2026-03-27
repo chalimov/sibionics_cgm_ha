@@ -18,6 +18,7 @@ from homeassistant.const import CONF_ADDRESS, CONF_NAME
 
 from .const import (
     CONF_BLE_MATCH_KEY,
+    CONF_PATIENT_NAME,
     CONF_QR_CODE,
     CONF_SENSITIVITY_INPUT,
     CONF_SENSOR_SERIAL,
@@ -80,6 +81,7 @@ class SibionicsCGMConfigFlow(ConfigFlow, domain=DOMAIN):
         self._qr_data: dict[str, str] = {}
         self._address: str = ""
         self._name: str = ""
+        self._patient_name: str = ""
 
     async def async_step_bluetooth(
         self, discovery_info: bluetooth.BluetoothServiceInfoBleak
@@ -140,6 +142,7 @@ class SibionicsCGMConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
+            self._patient_name = user_input.get(CONF_PATIENT_NAME, "").strip()
             qr_raw = user_input[CONF_QR_CODE].strip()
             try:
                 self._qr_data = parse_qr_code(qr_raw)
@@ -162,7 +165,10 @@ class SibionicsCGMConfigFlow(ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="qr_code",
             data_schema=vol.Schema(
-                {vol.Required(CONF_QR_CODE): str}
+                {
+                    vol.Required(CONF_PATIENT_NAME): str,
+                    vol.Required(CONF_QR_CODE): str,
+                }
             ),
             description_placeholders={"name": self._name},
             errors=errors,
@@ -173,11 +179,13 @@ class SibionicsCGMConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         """Confirm setup."""
         if user_input is not None:
+            title = f"SIBIONICS CGM — {self._patient_name}" if self._patient_name else f"SIBIONICS CGM ({self._name})"
             return self.async_create_entry(
-                title=f"SIBIONICS CGM ({self._name})",
+                title=title,
                 data={
                     CONF_ADDRESS: self._address,
                     CONF_NAME: self._name,
+                    CONF_PATIENT_NAME: self._patient_name,
                     CONF_QR_CODE: self._qr_data.get(CONF_SENSOR_SERIAL, ""),
                     CONF_SENSOR_SERIAL: self._qr_data.get(CONF_SENSOR_SERIAL, ""),
                     CONF_SENSITIVITY_INPUT: self._qr_data.get(CONF_SENSITIVITY_INPUT, ""),
@@ -190,6 +198,7 @@ class SibionicsCGMConfigFlow(ConfigFlow, domain=DOMAIN):
             step_id="confirm",
             description_placeholders={
                 "name": self._name,
+                "patient_name": self._patient_name or "Not provided",
                 "serial": self._qr_data.get(CONF_SENSOR_SERIAL, "unknown"),
                 "sensitivity_input": self._qr_data.get(CONF_SENSITIVITY_INPUT, "unknown"),
             },
