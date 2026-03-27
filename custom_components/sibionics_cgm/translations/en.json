@@ -31,6 +31,16 @@
       "qr_device_mismatch": "QR code does not match the discovered sensor. The match key from the QR serial should appear in the BLE device name."
     }
   },
+  "options": {
+    "step": {
+      "init": {
+        "title": "SIBIONICS CGM Settings",
+        "data": {
+          "patient_name": "Patient full name"
+        }
+      }
+    }
+  },
   "entity": {
     "sensor": {
       "glucose_mgdl": {

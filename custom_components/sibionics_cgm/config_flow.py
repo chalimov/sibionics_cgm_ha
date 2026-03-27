@@ -13,7 +13,7 @@ from typing import Any
 
 import voluptuous as vol
 from homeassistant.components import bluetooth
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
 from homeassistant.const import CONF_ADDRESS, CONF_NAME
 
 from .const import (
@@ -70,10 +70,41 @@ def _device_matches_qr(name: str | None, ble_match_key: str) -> bool:
     return name.upper().endswith(ble_match_key.upper())
 
 
+class SibionicsCGMOptionsFlow(OptionsFlow):
+    """Handle options for SIBIONICS CGM (edit patient name)."""
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Manage options."""
+        if user_input is not None:
+            new_name = user_input[CONF_PATIENT_NAME].strip()
+            # Update config entry data with new patient name
+            new_data = {**self.config_entry.data, CONF_PATIENT_NAME: new_name}
+            self.hass.config_entries.async_update_entry(
+                self.config_entry, data=new_data,
+                title=f"SIBIONICS CGM — {new_name}" if new_name else f"SIBIONICS CGM ({new_data.get(CONF_NAME, '')})",
+            )
+            return self.async_create_entry(data={})
+
+        current_name = self.config_entry.data.get(CONF_PATIENT_NAME, "")
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema(
+                {vol.Required(CONF_PATIENT_NAME, default=current_name): str}
+            ),
+        )
+
+
 class SibionicsCGMConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for SIBIONICS CGM."""
 
     VERSION = 1
+
+    @staticmethod
+    def async_get_options_flow(config_entry: ConfigEntry) -> SibionicsCGMOptionsFlow:
+        """Get the options flow."""
+        return SibionicsCGMOptionsFlow()
 
     def __init__(self) -> None:
         """Initialize flow."""
