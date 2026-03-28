@@ -732,23 +732,8 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
                 days_remaining=days_remaining,
             )
 
-            # Write historical readings (device timestamp > 2 min old) to
-            # recorder with original timestamps. This covers both the initial
-            # history burst AND reconnect catch-up bursts.
-            now_ts = time.time()
-            historical = [
-                (idx, rt, rg, tmp) for idx, rt, rg, tmp in batch
-                if self._readings.get(idx) and rt.timestamp() < now_ts - 120
-            ]
-            if historical:
-                await self._write_historical_states(historical)
-
-            is_live = latest.timestamp.timestamp() >= now_ts - 120
-
-            # For live readings, only push to HA every 5 minutes
-            # (matching official app display interval).
-            # The algorithm still processes every 1-min reading internally.
-            if is_live:
+            if self._history_done:
+                # Live mode — push to HA every 5 minutes only
                 if latest.index % 5 == 0:
                     self.async_set_updated_data(self.data)
                     _LOGGER.info(
@@ -757,8 +742,9 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
                         latest.timestamp.strftime("%H:%M"),
                     )
             else:
-                # During burst, push coordinator data so trend/battery/etc update
-                # but DON'T write glucose state (historical backfill handles it)
+                # History burst — write to recorder with device timestamps
+                await self._write_historical_states(batch)
+                # Push coordinator data so trend/battery/etc update
                 self.async_set_updated_data(self.data)
                 if len(batch) > 1:
                     _LOGGER.debug(
