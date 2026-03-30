@@ -577,9 +577,30 @@ class CalibrationEngine:
                 _LOGGER.warning("pow(%.6g, %.6g) failed, returning NaN", b, e)
                 r = float("nan")
             self._write_d(uc, UC_ARM64_REG_D0, r)
-        # Note: math functions (exp, expf, sqrt, log, fabs, etc.) are NOT hooked.
-        # They are resolved within the .so libraries' own compiled code.
-        # Only pow() needs a hook (confirmed by the working standalone emulator).
+        elif name == "exp":
+            x = self._read_d(uc, UC_ARM64_REG_D0)
+            self._write_d(uc, UC_ARM64_REG_D0, math.exp(min(x, 709.0)))
+        elif name == "expf":
+            x = self._read_s(uc)
+            self._write_s(uc, math.exp(min(x, 88.0)))
+        elif name == "log":
+            x = self._read_d(uc, UC_ARM64_REG_D0)
+            self._write_d(uc, UC_ARM64_REG_D0, math.log(x) if x > 0 else float("-inf"))
+        elif name == "logf":
+            x = self._read_s(uc)
+            self._write_s(uc, math.log(x) if x > 0 else float("-inf"))
+        elif name == "sqrt":
+            x = self._read_d(uc, UC_ARM64_REG_D0)
+            self._write_d(uc, UC_ARM64_REG_D0, math.sqrt(max(x, 0.0)))
+        elif name == "sqrtf":
+            x = self._read_s(uc)
+            self._write_s(uc, math.sqrt(max(x, 0.0)))
+        elif name == "fabs":
+            x = self._read_d(uc, UC_ARM64_REG_D0)
+            self._write_d(uc, UC_ARM64_REG_D0, abs(x))
+        elif name == "fabsf":
+            x = self._read_s(uc)
+            self._write_s(uc, abs(x))
         # ── Memory ──
         elif name == "malloc":
             sz = uc.reg_read(UC_ARM64_REG_X0) or 1
