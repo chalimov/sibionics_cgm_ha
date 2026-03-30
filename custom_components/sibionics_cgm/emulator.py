@@ -881,6 +881,13 @@ class CalibrationEngine:
                 uc.reg_write(UC_ARM64_REG_X0, 0)
         elif name.startswith("__gxx_"):
             uc.reg_write(UC_ARM64_REG_X0, 0)
+        elif name in ("exp", "expf", "log", "logf", "sqrt", "sqrtf",
+                      "fabs", "fabsf", "ceil", "ceilf", "floor", "floorf",
+                      "round", "roundf", "sin", "cos", "tan", "asin",
+                      "acos", "atan", "atan2"):
+            # Known math functions — D0/S0 left unchanged (matches
+            # standalone emulator behavior). Silent at runtime.
+            uc.reg_write(UC_ARM64_REG_X0, 0)
         else:
             _LOGGER.warning("Unhooked function called: %s at PC=0x%x", name, pc)
             uc.reg_write(UC_ARM64_REG_X0, 0)
