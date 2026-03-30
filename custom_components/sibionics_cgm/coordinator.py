@@ -484,8 +484,13 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
             # Emulator has processed data this session — just catch up
             request_from = self._last_received_index + 1 if self._last_received_index >= 0 else 0
         else:
-            # Fresh emulator — need full history for filter convergence
-            request_from = 0
+            # Fresh emulator — request last ~5 hours (300 readings) for
+            # Kalman filter convergence. Full history from 0 takes too
+            # long through ARM64 emulation and blocks live data.
+            if self._last_received_index > 300:
+                request_from = self._last_received_index - 300
+            else:
+                request_from = 0
         _LOGGER.debug(
             "Sending TIME_SYNC + DATA_REQUEST(idx=%d) [last_received=%d]",
             request_from, self._last_received_index,
