@@ -12,12 +12,9 @@ import logging
 import math
 import struct
 import time
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from typing import Any
-
-from homeassistant.core import Context
-from homeassistant.util.ulid import ulid_at_time
 
 from bleak import BleakClient
 from bleak.exc import BleakError
@@ -152,9 +149,6 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
 
         # Data state
         self.data = SibionicsCGMData()
-
-        # Entity IDs for historical state writing (set by sensor platform)
-        self._glucose_entity_id: str | None = None
 
     @property
     def address(self) -> str:
@@ -742,10 +736,11 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
                         latest.timestamp.strftime("%H:%M"),
                     )
             else:
-                # History burst — write to recorder with device timestamps
-                await self._write_historical_states(batch)
-                # Push coordinator data so trend/battery/etc update
-                self.async_set_updated_data(self.data)
+                # History burst — calibrate silently for Kalman filter
+                # convergence. Do NOT write individual states to HA;
+                # rapid-fire hass.states.async_set races with
+                # _history_done flip and produces wall-clock-timestamped
+                # duplicates that corrupt the history graph.
                 if len(batch) > 1:
                     _LOGGER.debug(
                         "History burst: %d readings (idx %d-%d), latest: %d mg/dL",
@@ -786,41 +781,6 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
         elif rate < -0.03:
             return "slow_fall"
         return "stable"
-
-    async def _write_historical_states(
-        self, batch: list[tuple[int, datetime, float, float]]
-    ) -> None:
-        """Write historical readings to HA recorder with device timestamps.
-
-        Uses hass.states.async_set with the timestamp parameter so
-        the recorder stores each reading at its original device time,
-        producing correct history graphs.
-
-        """
-        if not self._glucose_entity_id:
-            return
-
-        for index, reading_time, raw_mmol, temperature in batch:
-            reading = self._readings.get(index)
-            if not reading:
-                continue
-
-            ts = reading.timestamp.timestamp()
-            self.hass.states.async_set(
-                self._glucose_entity_id,
-                str(reading.glucose_mgdl),
-                attributes={
-                    "unit_of_measurement": "mg/dL",
-                    "state_class": "measurement",
-                    "icon": "mdi:diabetes",
-                    "friendly_name": f"{self._name} Glucose",
-                },
-                force_update=True,
-                context=Context(id=ulid_at_time(ts)),
-                timestamp=ts,
-            )
-            # Small yield between writes so recorder can commit each state
-            await asyncio.sleep(0)
 
     async def _wait_response(self, timeout: float = 10.0) -> bool:
         """Wait for a response from the sensor."""
