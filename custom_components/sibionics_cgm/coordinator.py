@@ -21,7 +21,8 @@ from bleak.exc import BleakError
 from bleak_retry_connector import establish_connection
 from homeassistant.components import bluetooth
 from homeassistant.components.bluetooth import BluetoothCallbackMatcher
-from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
+from homeassistant.core import CALLBACK_TYPE, Context, HomeAssistant, callback
+from homeassistant.util.ulid import ulid_at_time
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
@@ -149,6 +150,9 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
 
         # Data state
         self.data = SibionicsCGMData()
+
+        # Entity ID for historical state writing (set by sensor platform)
+        self._glucose_entity_id: str | None = None
 
     @property
     def address(self) -> str:
@@ -736,11 +740,11 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
                         latest.timestamp.strftime("%H:%M"),
                     )
             else:
-                # History burst — calibrate silently for Kalman filter
-                # convergence. Do NOT write individual states to HA;
-                # rapid-fire hass.states.async_set races with
-                # _history_done flip and produces wall-clock-timestamped
-                # duplicates that corrupt the history graph.
+                # History burst — write every 5th reading to HA with
+                # device timestamps. Do NOT call async_set_updated_data
+                # here; that races with _history_done flip and causes
+                # wall-clock-timestamped duplicates.
+                await self._write_historical_states(batch)
                 if len(batch) > 1:
                     _LOGGER.debug(
                         "History burst: %d readings (idx %d-%d), latest: %d mg/dL",
@@ -781,6 +785,43 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
         elif rate < -0.03:
             return "slow_fall"
         return "stable"
+
+    async def _write_historical_states(
+        self, batch: list[tuple[int, datetime, float, float]]
+    ) -> None:
+        """Write historical readings to HA recorder with device timestamps.
+
+        Writes every 5th calibrated reading (matching the 5-minute live
+        update interval) using hass.states.async_set with the timestamp
+        parameter so the recorder stores each reading at its original
+        device time. Does NOT call async_set_updated_data to avoid
+        the race condition that caused wall-clock duplicate writes.
+        """
+        if not self._glucose_entity_id:
+            return
+
+        for index, reading_time, raw_mmol, temperature in batch:
+            # Only write every 5th reading (5-minute intervals)
+            if index % 5 != 0:
+                continue
+            reading = self._readings.get(index)
+            if not reading:
+                continue
+
+            ts = reading.timestamp.timestamp()
+            self.hass.states.async_set(
+                self._glucose_entity_id,
+                str(reading.glucose_mgdl),
+                attributes={
+                    "unit_of_measurement": "mg/dL",
+                    "state_class": "measurement",
+                    "icon": "mdi:diabetes",
+                    "friendly_name": f"{self._name} Glucose",
+                },
+                force_update=True,
+                context=Context(id=ulid_at_time(ts)),
+                timestamp=ts,
+            )
 
     async def _wait_response(self, timeout: float = 10.0) -> bool:
         """Wait for a response from the sensor."""
