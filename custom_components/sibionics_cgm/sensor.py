@@ -197,6 +197,11 @@ class SibionicsCGMSensor(
 
         if key == "glucose_mgdl":
             self._attr_native_value = data.glucose_mgdl
+            # During history burst, glucose states are written directly
+            # via hass.states.async_set with device timestamps. Skip
+            # the entity callback write to avoid wall-clock duplicates.
+            if not self.coordinator._history_done:
+                return
         elif key == "glucose_mmol":
             self._attr_native_value = data.glucose_mmol
         elif key == "trend":
