@@ -154,6 +154,10 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
         # Entity ID for historical state writing (set by sensor platform)
         self._glucose_entity_id: str | None = None
 
+        # Track last timestamp written to recorder to avoid duplicates
+        # on reconnect (device replays history we already wrote)
+        self._last_written_ts: float = 0.0
+
     @property
     def address(self) -> str:
         return self._address
@@ -201,6 +205,8 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
                 device_state="disconnected",
                 patient_name=self.data.patient_name,
             )
+            # Set last_written_ts so we don't re-write history we already have
+            self._last_written_ts = latest.timestamp.timestamp()
 
     async def async_save_data(self) -> None:
         """Persist readings to disk."""
@@ -809,6 +815,11 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
                 continue
 
             ts = reading.timestamp.timestamp()
+
+            # Skip timestamps we already wrote (prevents duplicates on reconnect)
+            if ts <= self._last_written_ts:
+                continue
+
             self.hass.states.async_set(
                 self._glucose_entity_id,
                 str(reading.glucose_mgdl),
@@ -822,6 +833,7 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
                 context=Context(id=ulid_at_time(ts)),
                 timestamp=ts,
             )
+            self._last_written_ts = ts
 
     async def _wait_response(self, timeout: float = 10.0) -> bool:
         """Wait for a response from the sensor."""
