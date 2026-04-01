@@ -133,6 +133,7 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
         # Queue for ordered calibration of incoming readings
         self._pending_readings: list[tuple[int, datetime, float, float]] = []
         self._processing_lock = asyncio.Lock()
+        self._batch_tasks: set[asyncio.Task] = set()
 
         # Emulator (initialized lazily in executor)
         self._engine: Any = None
@@ -316,7 +317,7 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
         _LOGGER.debug("BLE advertisement from %s, attempting connection", self._address)
         self._safe_create_task(self._async_connect_and_run())
 
-    def _safe_create_task(self, coro: Any) -> None:
+    def _safe_create_task(self, coro: Any) -> asyncio.Task:
         """Create a background task with exception logging.
 
         Uses async_create_background_task so long-running data processing
@@ -329,7 +330,7 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
             except Exception:
                 _LOGGER.exception("Task failed unexpectedly")
 
-        self.hass.async_create_background_task(
+        return self.hass.async_create_background_task(
             _wrapper(), f"sibionics_cgm_{self._address}"
         )
 
@@ -526,6 +527,14 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
             else:
                 no_data_count += 1
                 if not self._history_done and self._readings:
+                    # Wait for all in-flight batch processing to finish
+                    # before declaring history complete — batches that
+                    # reach the branch check after _history_done flips
+                    # would skip _write_historical_states entirely.
+                    if self._batch_tasks:
+                        await asyncio.gather(
+                            *self._batch_tasks, return_exceptions=True
+                        )
                     self._history_done = True
                     _LOGGER.info(
                         "History complete: %d readings, waiting for live data",
@@ -621,9 +630,11 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
             if batch:
                 # Process all readings in this packet in order (critical for
                 # the algorithm's Kalman filter to converge correctly).
-                self._safe_create_task(
+                task = self._safe_create_task(
                     self._async_process_batch(batch)
                 )
+                self._batch_tasks.add(task)
+                task.add_done_callback(self._batch_tasks.discard)
 
             self._state = "data_received"
             self._response_event.set()
