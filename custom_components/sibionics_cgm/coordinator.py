@@ -206,9 +206,10 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
                 device_state="disconnected",
                 patient_name=self.data.patient_name,
             )
-            # Note: _last_written_ts starts at 0 so full history is written
-            # to the recorder on each HA restart. It only prevents duplicates
-            # from BLE reconnects within the same HA session.
+            # Restore _last_written_ts so history writes are not duplicated
+            # across HA restarts. Without this, every restart replays and
+            # re-writes the full history to the recorder.
+            self._last_written_ts = stored.get("last_written_ts", 0.0)
 
     async def async_save_data(self) -> None:
         """Persist readings to disk."""
@@ -227,6 +228,7 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
                 }
                 for r in recent
             ],
+            "last_written_ts": self._last_written_ts,
         }
         await self._store.async_save(data)
 
