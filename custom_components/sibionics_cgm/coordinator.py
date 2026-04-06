@@ -158,6 +158,10 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
         # Track last timestamp written to recorder to avoid duplicates
         # on reconnect (device replays history we already wrote)
         self._last_written_ts: float = 0.0
+        # Index-based dedup: the sensor sends overlapping index ranges
+        # with sub-second ts_base differences on reconnect, so timestamp
+        # comparison alone misses duplicates. Track every index we wrote.
+        self._written_indices: set[int] = set()
 
     @property
     def address(self) -> str:
@@ -753,12 +757,23 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
             if self._history_done:
                 # Live mode — push to HA every 5 minutes only
                 if latest.index % 5 == 0:
-                    self.async_set_updated_data(self.data)
-                    _LOGGER.info(
-                        "LIVE #%d: %d mg/dL (%.1f mmol/L) at %s",
-                        latest.index, latest.glucose_mgdl, latest.glucose_mmol,
-                        latest.timestamp.strftime("%H:%M"),
-                    )
+                    # Only push to entity state if the reading is recent.
+                    # Stale readings (from late-arriving history batches
+                    # processed after _history_done flipped) would inject
+                    # phantom values into entity state and corrupt statistics.
+                    age = time.time() - latest.timestamp.timestamp()
+                    if age < 600:  # 10 minutes
+                        self.async_set_updated_data(self.data)
+                        _LOGGER.info(
+                            "LIVE #%d: %d mg/dL (%.1f mmol/L) at %s",
+                            latest.index, latest.glucose_mgdl, latest.glucose_mmol,
+                            latest.timestamp.strftime("%H:%M"),
+                        )
+                    else:
+                        _LOGGER.debug(
+                            "Skipping stale reading #%d (age %.0fs) in live mode",
+                            latest.index, age,
+                        )
             else:
                 # History burst — write every 5th reading to HA with
                 # device timestamps. Do NOT call async_set_updated_data
@@ -824,13 +839,20 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
             # Only write every 5th reading (5-minute intervals)
             if index % 5 != 0:
                 continue
+
+            # Index-based dedup: the sensor sends overlapping index ranges
+            # with sub-second ts_base drift on reconnect, so the same
+            # reading gets different float timestamps.  Track by index.
+            if index in self._written_indices:
+                continue
+
             reading = self._readings.get(index)
             if not reading:
                 continue
 
             ts = reading.timestamp.timestamp()
 
-            # Skip timestamps we already wrote (prevents duplicates on reconnect)
+            # Coarse timestamp guard (cross-restart protection)
             if ts <= self._last_written_ts:
                 continue
 
@@ -848,6 +870,7 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
                 timestamp=ts,
             )
             self._last_written_ts = ts
+            self._written_indices.add(index)
 
     async def _wait_response(self, timeout: float = 10.0) -> bool:
         """Wait for a response from the sensor."""

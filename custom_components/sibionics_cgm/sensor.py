@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time as _time
 from datetime import datetime
 from typing import Any
 
@@ -202,6 +203,12 @@ class SibionicsCGMSensor(
             # the entity callback write to avoid wall-clock duplicates.
             if not self.coordinator._history_done:
                 return
+            # Defense-in-depth: reject stale readings that would inject
+            # phantom values into entity state and corrupt statistics.
+            if data.last_reading_time:
+                age = _time.time() - data.last_reading_time.timestamp()
+                if age > 600:  # 10 minutes
+                    return
         elif key == "glucose_mmol":
             self._attr_native_value = data.glucose_mmol
         elif key == "trend":
