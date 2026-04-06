@@ -165,6 +165,9 @@ class SibionicsCGMSensor(
         self._attr_unique_id = f"{address}-{description.key}"
         self._address = address
         self._device_name = name
+        # Track last reading time written to avoid duplicate glucose writes
+        # from non-glucose coordinator updates (connection state, etc.)
+        self._last_glucose_write_time: datetime | None = None
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -209,6 +212,12 @@ class SibionicsCGMSensor(
                 age = _time.time() - data.last_reading_time.timestamp()
                 if age > 600:  # 10 minutes
                     return
+            # Only write when a NEW glucose reading arrived — skip writes
+            # triggered by non-glucose coordinator updates (connection
+            # state, device_state, etc.) that don't change the glucose value.
+            if data.last_reading_time == self._last_glucose_write_time:
+                return
+            self._last_glucose_write_time = data.last_reading_time
         elif key == "glucose_mmol":
             self._attr_native_value = data.glucose_mmol
         elif key == "trend":
