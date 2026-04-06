@@ -836,10 +836,6 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
             return
 
         for index, reading_time, raw_mmol, temperature in batch:
-            # Only write every 5th reading (5-minute intervals)
-            if index % 5 != 0:
-                continue
-
             # Index-based dedup: the sensor sends overlapping index ranges
             # with sub-second ts_base drift on reconnect, so the same
             # reading gets different float timestamps.  Track by index.
