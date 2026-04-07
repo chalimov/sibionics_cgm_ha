@@ -584,12 +584,12 @@ class CalibrationEngine:
                 r = float("inf")
             self._write_d(uc, UC_ARM64_REG_D0, r)
         elif name == "expf":
-            x = self._read_d(uc, UC_ARM64_REG_D0)
+            x = self._read_s(uc)
             try:
                 r = math.exp(x)
             except OverflowError:
                 r = float("inf")
-            self._write_d(uc, UC_ARM64_REG_D0, r)
+            self._write_s(uc, r)
         # ── Memory ──
         elif name == "malloc":
             sz = uc.reg_read(UC_ARM64_REG_X0) or 1
