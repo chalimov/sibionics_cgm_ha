@@ -546,6 +546,10 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
                         "History complete: %d readings, waiting for live data",
                         len(self._readings),
                     )
+                    # Flush historical readings to HA now that all
+                    # calibration is done. Values in self._readings
+                    # are final (Kalman filter converged).
+                    await self._flush_historical_states()
                     # Push state once now so entities show the latest
                     # calibrated value while waiting for first live reading
                     self.async_set_updated_data(self.data)
@@ -775,11 +779,12 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
                             latest.index, age,
                         )
             else:
-                # History burst — write every 5th reading to HA with
-                # device timestamps. Do NOT call async_set_updated_data
-                # here; that races with _history_done flip and causes
-                # wall-clock-timestamped duplicates.
-                await self._write_historical_states(batch)
+                # History burst — just calibrate and store readings.
+                # Do NOT write to HA yet: the Kalman filter needs all
+                # overlapping packets to converge. Writing now produces
+                # values 5-8 mg/dL too low. The correct values are
+                # flushed in _flush_historical_states after all batches
+                # complete.
                 if len(batch) > 1:
                     _LOGGER.debug(
                         "History burst: %d readings (idx %d-%d), latest: %d mg/dL",
@@ -821,38 +826,27 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
             return "slow_fall"
         return "stable"
 
-    async def _write_historical_states(
-        self, batch: list[tuple[int, datetime, float, float]]
-    ) -> None:
-        """Write historical readings to HA recorder with device timestamps.
+    async def _flush_historical_states(self) -> None:
+        """Write finalized historical readings to HA recorder.
 
-        Writes every 5th calibrated reading (matching the 5-minute live
-        update interval) using hass.states.async_set with the timestamp
-        parameter so the recorder stores each reading at its original
-        device time. Does NOT call async_set_updated_data to avoid
-        the race condition that caused wall-clock duplicate writes.
+        Called once after all history batches are calibrated and
+        _history_done is True. Values in self._readings are final
+        (Kalman filter has converged on overlapping packets), so they
+        match FHIR. Writes every 5th reading with device timestamps.
         """
         if not self._glucose_entity_id:
             return
 
-        for index, reading_time, raw_mmol, temperature in batch:
-            # Only write every 5th reading (5-minute intervals)
+        written = 0
+        for index in sorted(self._readings):
             if index % 5 != 0:
                 continue
-
-            # Index-based dedup: the sensor sends overlapping index ranges
-            # with sub-second ts_base drift on reconnect, so the same
-            # reading gets different float timestamps.  Track by index.
             if index in self._written_indices:
                 continue
 
-            reading = self._readings.get(index)
-            if not reading:
-                continue
-
+            reading = self._readings[index]
             ts = reading.timestamp.timestamp()
 
-            # Coarse timestamp guard (cross-restart protection)
             if ts <= self._last_written_ts:
                 continue
 
@@ -871,6 +865,11 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
             )
             self._last_written_ts = ts
             self._written_indices.add(index)
+            written += 1
+
+        if written:
+            _LOGGER.info("Flushed %d historical readings to HA recorder", written)
+            await self.async_save_data()
 
     async def _wait_response(self, timeout: float = 10.0) -> bool:
         """Wait for a response from the sensor."""
