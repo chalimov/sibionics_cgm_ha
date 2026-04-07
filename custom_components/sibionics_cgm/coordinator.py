@@ -550,10 +550,6 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
                         "History complete: %d readings, waiting for live data",
                         len(self._readings),
                     )
-                    # Flush historical readings to HA now that all
-                    # calibration is done. Values in self._readings
-                    # are final (Kalman filter converged).
-                    await self._flush_historical_states()
                     # Push state once now so entities show the latest
                     # calibrated value while waiting for first live reading
                     self.async_set_updated_data(self.data)
@@ -793,12 +789,12 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
                             latest.index, age,
                         )
             else:
-                # History burst — just calibrate and store readings.
-                # Do NOT write to HA yet: the Kalman filter needs all
-                # overlapping packets to converge. Writing now produces
-                # values 5-8 mg/dL too low. The correct values are
-                # flushed in _flush_historical_states after all batches
-                # complete.
+                # History burst — write this batch's readings to HA now.
+                # With _calibrated_indices preventing duplicate index feeds,
+                # each reading is calibrated exactly once and the value is
+                # final. Must write per-batch because _readings is trimmed
+                # and earlier indices would be lost by the time the burst ends.
+                await self._flush_historical_states()
                 if len(batch) > 1:
                     _LOGGER.debug(
                         "History burst: %d readings (idx %d-%d), latest: %d mg/dL",
