@@ -727,15 +727,6 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
                 )
                 self._readings[index] = reading
 
-            # Trim in-memory readings to prevent unbounded growth
-            if len(self._readings) > MAX_READINGS_IN_MEMORY:
-                sorted_keys = sorted(self._readings.keys())
-                for k in sorted_keys[:-MAX_READINGS_IN_MEMORY]:
-                    del self._readings[k]
-                # Keep _calibrated_indices in sync
-                keep = set(self._readings.keys())
-                self._calibrated_indices &= keep
-
             # After processing the entire batch, update internal state
             if not self._readings:
                 return
@@ -789,17 +780,24 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
                             latest.index, age,
                         )
             else:
-                # History burst — write this batch's readings to HA now.
-                # With _calibrated_indices preventing duplicate index feeds,
-                # each reading is calibrated exactly once and the value is
-                # final. Must write per-batch because _readings is trimmed
-                # and earlier indices would be lost by the time the burst ends.
+                # History burst — flush to HA BEFORE trim so early indices
+                # aren't lost. With _calibrated_indices preventing duplicate
+                # feeds, each value is final on first calibration.
                 await self._flush_historical_states()
                 if len(batch) > 1:
                     _LOGGER.debug(
                         "History burst: %d readings (idx %d-%d), latest: %d mg/dL",
                         len(batch), batch[0][0], batch[-1][0], latest.glucose_mgdl,
                     )
+
+            # Trim in-memory readings to prevent unbounded growth
+            if len(self._readings) > MAX_READINGS_IN_MEMORY:
+                sorted_keys = sorted(self._readings.keys())
+                for k in sorted_keys[:-MAX_READINGS_IN_MEMORY]:
+                    del self._readings[k]
+                # Keep _calibrated_indices in sync
+                keep = set(self._readings.keys())
+                self._calibrated_indices &= keep
 
             # Persist readings to survive HA restarts
             await self.async_save_data()

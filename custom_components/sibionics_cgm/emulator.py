@@ -381,7 +381,6 @@ class CalibrationEngine:
             self._ctx_addr = self._heap.malloc(CTX_SIZE + 256)
             self._uc.mem_write(self._ctx_addr, b"\x00" * (CTX_SIZE + 256))
 
-            # Use dll_init with decrypted sensitivity (matching working standalone emulator)
             algo_info = self._libs["algo"]
             base = algo_info["base"]
 
