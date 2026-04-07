@@ -576,11 +576,20 @@ class CalibrationEngine:
                 _LOGGER.warning("pow(%.6g, %.6g) failed, returning NaN", b, e)
                 r = float("nan")
             self._write_d(uc, UC_ARM64_REG_D0, r)
-        # Note: math functions (exp, expf, sqrt, log, fabs, etc.) are NOT
-        # hooked — they reach the fallback which leaves D0/S0 unchanged.
-        # The standalone emulator has the same behavior and the calibration
-        # algorithm produces correct results with it. Hooking exp() with
-        # the real math.exp() actually breaks calibration accuracy.
+        elif name == "exp":
+            x = self._read_d(uc, UC_ARM64_REG_D0)
+            try:
+                r = math.exp(x)
+            except OverflowError:
+                r = float("inf")
+            self._write_d(uc, UC_ARM64_REG_D0, r)
+        elif name == "expf":
+            x = self._read_d(uc, UC_ARM64_REG_D0)
+            try:
+                r = math.exp(x)
+            except OverflowError:
+                r = float("inf")
+            self._write_d(uc, UC_ARM64_REG_D0, r)
         # ── Memory ──
         elif name == "malloc":
             sz = uc.reg_read(UC_ARM64_REG_X0) or 1
@@ -880,12 +889,12 @@ class CalibrationEngine:
                 uc.reg_write(UC_ARM64_REG_X0, 0)
         elif name.startswith("__gxx_"):
             uc.reg_write(UC_ARM64_REG_X0, 0)
-        elif name in ("exp", "expf", "log", "logf", "sqrt", "sqrtf",
+        elif name in ("log", "logf", "sqrt", "sqrtf",
                       "fabs", "fabsf", "ceil", "ceilf", "floor", "floorf",
                       "round", "roundf", "sin", "cos", "tan", "asin",
                       "acos", "atan", "atan2"):
-            # Known math functions — D0/S0 left unchanged (matches
-            # standalone emulator behavior). Silent at runtime.
+            # Known math functions — not called by the calibration algorithm.
+            # D0/S0 left unchanged. Silent at runtime.
             uc.reg_write(UC_ARM64_REG_X0, 0)
         else:
             _LOGGER.warning("Unhooked function called: %s at PC=0x%x", name, pc)
