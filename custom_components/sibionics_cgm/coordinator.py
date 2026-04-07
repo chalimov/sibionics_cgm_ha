@@ -508,6 +508,13 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
         else:
             # Fresh emulator — need full history for filter convergence
             request_from = 0
+            # Clear stale readings from previous emulator run — they were
+            # calibrated with different filter state and would cause trim
+            # to delete the new readings we're about to calibrate.
+            self._readings.clear()
+            self._written_indices.clear()
+            self._calibrated_indices.clear()
+            self._last_written_ts = 0.0
         _LOGGER.debug(
             "Sending TIME_SYNC + DATA_REQUEST(idx=%d) [last_received=%d]",
             request_from, self._last_received_index,
