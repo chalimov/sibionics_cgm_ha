@@ -162,6 +162,10 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
         # with sub-second ts_base differences on reconnect, so timestamp
         # comparison alone misses duplicates. Track every index we wrote.
         self._written_indices: set[int] = set()
+        # Track indices already passed to the ARM64 calibration engine.
+        # The algorithm's Kalman filter is stateful — re-feeding an index
+        # corrupts filter state and causes progressive calibration drift.
+        self._calibrated_indices: set[int] = set()
 
     @property
     def address(self) -> str:
@@ -672,10 +676,17 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
             )
 
             for index, reading_time, raw_mmol, temperature in batch:
+                # Skip indices already calibrated — the ARM64 algorithm's
+                # Kalman filter is stateful and re-feeding an index corrupts
+                # its internal state, causing progressive calibration drift.
+                if index in self._calibrated_indices:
+                    continue
+
                 # Calibrate in executor (CPU-heavy ARM64 emulation)
                 cal_mmol = await self.hass.async_add_executor_job(
                     self._calibrate, raw_mmol, temperature, index
                 )
+                self._calibrated_indices.add(index)
 
                 # Validate calibrated output
                 if not math.isfinite(cal_mmol) or cal_mmol < 0:
@@ -725,6 +736,9 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
                 sorted_keys = sorted(self._readings.keys())
                 for k in sorted_keys[:-MAX_READINGS_IN_MEMORY]:
                     del self._readings[k]
+                # Keep _calibrated_indices in sync
+                keep = set(self._readings.keys())
+                self._calibrated_indices &= keep
 
             # After processing the entire batch, update internal state
             if not self._readings:
