@@ -515,6 +515,7 @@ class SibionicsCGMCoordinator(DataUpdateCoordinator[SibionicsCGMData]):
             self._written_indices.clear()
             self._calibrated_indices.clear()
             self._last_written_ts = 0.0
+            self._last_received_index = -1
         _LOGGER.debug(
             "Sending TIME_SYNC + DATA_REQUEST(idx=%d) [last_received=%d]",
             request_from, self._last_received_index,
